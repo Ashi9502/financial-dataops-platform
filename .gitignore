@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+.venv-wsl/
+
+# Environment / secrets
+.env
+
+# Runtime data
+data/raw/*
+!data/raw/.gitkeep
+data/quarantine/*
+!data/quarantine/.gitkeep
+
+# Airflow runtime
+airflow/logs/
+airflow/airflow.db
+airflow/webserver_config.py
+
+# dbt runtime
+dbt/target/
+dbt/logs/
+dbt/dbt_packages/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+dbt/.user.yml

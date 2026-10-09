@@ -1,0 +1,14 @@
+financial_dataops:
+  target: dev
+
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('WAREHOUSE_POSTGRES_HOST', 'localhost') }}"
+      port: "{{ env_var('WAREHOUSE_POSTGRES_PORT', '5434') | int }}"
+      user: "{{ env_var('WAREHOUSE_POSTGRES_USER') }}"
+      password: "{{ env_var('WAREHOUSE_POSTGRES_PASSWORD') }}"
+      dbname: "{{ env_var('WAREHOUSE_POSTGRES_DB') }}"
+      schema: analytics
+      threads: 4
+      connect_timeout: 10

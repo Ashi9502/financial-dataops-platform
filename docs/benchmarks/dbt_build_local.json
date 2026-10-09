@@ -1,0 +1,17 @@
+{
+  "benchmark": "local_dbt_build",
+  "timestamp_utc": "2026-10-09T17:33:42.463088+00:00",
+  "elapsed_seconds": 48.038,
+  "python_version": "3.14.4",
+  "platform": "Linux-6.18.40.1-microsoft-standard-WSL2-x86_64-with-glibc2.43",
+  "result_count": 100,
+  "status_counts": {
+    "pass": 89,
+    "success": 11
+  },
+  "resource_type_counts": {
+    "test": 89,
+    "model": 11
+  },
+  "environment_note": "Local WSL2 development benchmark; not a production or distributed benchmark."
+}

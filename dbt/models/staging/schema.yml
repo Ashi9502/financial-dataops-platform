@@ -1,0 +1,70 @@
+version: 2
+
+models:
+  - name: stg_customers
+    description: Cleaned customer staging model.
+
+    columns:
+      - name: customer_id
+        data_tests:
+          - not_null
+          - unique
+
+      - name: customer_name
+        data_tests:
+          - not_null
+
+      - name: email
+        data_tests:
+          - not_null
+
+  - name: stg_merchants
+    description: Cleaned merchant staging model.
+
+    columns:
+      - name: merchant_id
+        data_tests:
+          - not_null
+          - unique
+
+      - name: merchant_name
+        data_tests:
+          - not_null
+
+  - name: stg_transactions
+    description: Cleaned latest-state transaction staging model.
+
+    columns:
+      - name: transaction_id
+        data_tests:
+          - not_null
+          - unique
+
+      - name: customer_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
+
+      - name: merchant_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_merchants')
+                field: merchant_id
+
+      - name: amount
+        data_tests:
+          - not_null
+
+      - name: transaction_status
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - completed
+                  - refunded

@@ -1,0 +1,109 @@
+version: 2
+
+models:
+  - name: dim_customer
+    description: Current-state customer dimension.
+    columns:
+      - name: customer_key
+        data_tests:
+          - not_null
+          - unique
+
+      - name: customer_id
+        data_tests:
+          - not_null
+          - unique
+
+      - name: customer_name
+        data_tests:
+          - not_null
+
+  - name: dim_merchant
+    description: Current-state merchant dimension.
+    columns:
+      - name: merchant_key
+        data_tests:
+          - not_null
+          - unique
+
+      - name: merchant_id
+        data_tests:
+          - not_null
+          - unique
+
+      - name: merchant_name
+        data_tests:
+          - not_null
+
+  - name: fact_transactions
+    description: >
+      Transaction fact table at one row per transaction_id.
+
+    columns:
+      - name: transaction_id
+        data_tests:
+          - not_null
+          - unique
+
+      - name: customer_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_customer')
+                field: customer_key
+
+      - name: merchant_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_merchant')
+                field: merchant_key
+
+      - name: amount
+        data_tests:
+          - not_null
+
+      - name: signed_amount
+        data_tests:
+          - not_null
+
+      - name: transaction_status
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - completed
+                  - refunded
+
+  - name: mart_merchant_daily
+    description: >
+      Daily merchant transaction metrics at
+      merchant, transaction date and currency grain.
+
+    columns:
+      - name: transaction_date
+        data_tests:
+          - not_null
+
+      - name: merchant_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_merchant')
+                field: merchant_key
+
+      - name: currency
+        data_tests:
+          - not_null
+
+      - name: transaction_count
+        data_tests:
+          - not_null
+
+      - name: net_transaction_amount
+        data_tests:
+          - not_null

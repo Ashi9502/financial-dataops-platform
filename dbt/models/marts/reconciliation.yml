@@ -1,0 +1,34 @@
+version: 2
+
+models:
+  - name: fct_reconciliation
+    description: Settlement reconciliation between internal completed transactions and partner settlement records.
+
+    columns:
+      - name: scenario
+        data_tests:
+          - not_null
+
+      - name: settlement_date
+        data_tests:
+          - not_null
+
+      - name: merchant_id
+        data_tests:
+          - not_null
+
+      - name: currency
+        data_tests:
+          - not_null
+
+      - name: reconciliation_status
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - MATCHED
+                  - AMOUNT_MISMATCH
+                  - COUNT_MISMATCH
+                  - MISSING_SETTLEMENT
+                  - MISSING_TRANSACTION

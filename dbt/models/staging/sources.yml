@@ -1,0 +1,152 @@
+version: 2
+
+sources:
+  - name: raw
+    description: Raw warehouse landing tables populated by ingestion pipelines.
+    schema: raw
+
+    tables:
+      - name: customers
+        description: Latest customer records synchronized from the OLTP source.
+
+        columns:
+          - name: customer_id
+            data_tests:
+              - not_null
+              - unique
+
+          - name: full_name
+            data_tests:
+              - not_null
+
+          - name: email
+            data_tests:
+              - not_null
+
+          - name: country_code
+            data_tests:
+              - not_null
+
+      - name: merchants
+        description: Latest merchant records synchronized from the OLTP source.
+
+        columns:
+          - name: merchant_id
+            data_tests:
+              - not_null
+              - unique
+
+          - name: merchant_name
+            data_tests:
+              - not_null
+
+          - name: merchant_category
+            data_tests:
+              - not_null
+
+          - name: country_code
+            data_tests:
+              - not_null
+
+      - name: transactions
+        description: Latest-state transaction landing table loaded from Parquet batch objects.
+
+        columns:
+          - name: transaction_id
+            data_tests:
+              - not_null
+              - unique
+
+          - name: customer_id
+            data_tests:
+              - not_null
+              - relationships:
+                  arguments:
+                    to: source('raw', 'customers')
+                    field: customer_id
+
+          - name: merchant_id
+            data_tests:
+              - not_null
+              - relationships:
+                  arguments:
+                    to: source('raw', 'merchants')
+                    field: merchant_id
+
+          - name: amount
+            data_tests:
+              - not_null
+
+          - name: currency
+            data_tests:
+              - not_null
+
+          - name: status
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values:
+                      - completed
+                      - refunded
+
+      - name: settlements
+        description: Partner settlement records loaded from content-addressed CSV objects.
+
+        columns:
+          - name: raw_settlement_row_id
+            data_tests:
+              - not_null
+              - unique
+
+          - name: settlement_id
+            data_tests:
+              - not_null
+
+          - name: scenario
+            data_tests:
+              - not_null
+
+          - name: merchant_id
+            data_tests:
+              - not_null
+              - relationships:
+                  arguments:
+                    to: source('raw', 'merchants')
+                    field: merchant_id
+
+          - name: settlement_date
+            data_tests:
+              - not_null
+
+          - name: currency
+            data_tests:
+              - not_null
+
+          - name: transaction_count
+            data_tests:
+              - not_null
+
+          - name: gross_amount
+            data_tests:
+              - not_null
+
+          - name: fees
+            data_tests:
+              - not_null
+
+          - name: net_amount
+            data_tests:
+              - not_null
+
+          - name: source_object_key
+            data_tests:
+              - not_null
+
+          - name: source_file_sha256
+            data_tests:
+              - not_null
+
+          - name: source_row_number
+            data_tests:
+              - not_null

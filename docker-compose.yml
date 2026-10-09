@@ -1,0 +1,200 @@
+x-airflow-common: &airflow-common
+  image: financial-airflow:3.3.2
+  user: "${AIRFLOW_UID}:0"
+  environment: &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+    AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_META_USER}:${AIRFLOW_META_PASSWORD}@airflow-db:5432/${AIRFLOW_META_DB}
+
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-api-server:8080/execution/
+
+    AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW_JWT_SECRET}
+    AIRFLOW__API_AUTH__JWT_ISSUER: financial-dataops-platform
+    AIRFLOW__API__SECRET_KEY: ${AIRFLOW_API_SECRET}
+
+    AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS: "admin:admin"
+
+    PYTHONPATH: /opt/airflow/project
+    AIRFLOW__OPENLINEAGE__NAMESPACE: "financial-dataops-local"
+    AIRFLOW__OPENLINEAGE__TRANSPORT: '{"type":"http","url":"http://host.docker.internal:5050","endpoint":"api/v1/lineage"}'
+    AIRFLOW__OPENLINEAGE__EMISSION_POLICY: '[{"scope":{},"controls":{"include_source_code":false}}]'
+
+    SOURCE_POSTGRES_HOST: source-postgres
+    SOURCE_POSTGRES_PORT: "5432"
+    SOURCE_POSTGRES_DB: ${SOURCE_POSTGRES_DB}
+    SOURCE_POSTGRES_USER: ${SOURCE_POSTGRES_USER}
+    SOURCE_POSTGRES_PASSWORD: ${SOURCE_POSTGRES_PASSWORD}
+
+    WAREHOUSE_POSTGRES_HOST: warehouse-postgres
+    WAREHOUSE_POSTGRES_PORT: "5432"
+    WAREHOUSE_POSTGRES_DB: ${WAREHOUSE_POSTGRES_DB}
+    WAREHOUSE_POSTGRES_USER: ${WAREHOUSE_POSTGRES_USER}
+    WAREHOUSE_POSTGRES_PASSWORD: ${WAREHOUSE_POSTGRES_PASSWORD}
+
+    S3_ENDPOINT_URL: http://object-store:8333
+    S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+    S3_SECRET_KEY: ${S3_SECRET_KEY}
+    S3_BUCKET: ${S3_BUCKET}
+
+  volumes:
+    - ./airflow/dags:/opt/airflow/dags
+    - ./airflow/logs:/opt/airflow/logs
+    - ./airflow/plugins:/opt/airflow/plugins
+    - ./airflow/config:/opt/airflow/config
+    - ./src:/opt/airflow/project/src:ro
+    - ./dbt:/opt/airflow/project/dbt:ro
+    - ./data:/opt/airflow/project/data:ro
+  networks:
+    - financial-network
+
+services:
+
+  source-postgres:
+    image: postgres:17
+    container_name: financial-source-postgres
+    environment:
+      POSTGRES_DB: ${SOURCE_POSTGRES_DB}
+      POSTGRES_USER: ${SOURCE_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${SOURCE_POSTGRES_PASSWORD}
+    ports:
+      - "5433:5432"
+    volumes:
+      - source_postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/source-init.sql:/docker-entrypoint-initdb.d/01-source-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SOURCE_POSTGRES_USER} -d ${SOURCE_POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - financial-network
+
+  warehouse-postgres:
+    image: postgres:17
+    container_name: financial-warehouse-postgres
+    environment:
+      POSTGRES_DB: ${WAREHOUSE_POSTGRES_DB}
+      POSTGRES_USER: ${WAREHOUSE_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${WAREHOUSE_POSTGRES_PASSWORD}
+    ports:
+      - "5434:5432"
+    volumes:
+      - warehouse_postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/warehouse-init.sql:/docker-entrypoint-initdb.d/01-warehouse-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${WAREHOUSE_POSTGRES_USER} -d ${WAREHOUSE_POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - financial-network
+
+  object-store:
+    image: chrislusf/seaweedfs:4.45
+    container_name: financial-object-store
+    environment:
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY}
+      S3_BUCKET: ${S3_BUCKET}
+    ports:
+      - "8333:8333"
+    volumes:
+      - object_store_data:/data
+    networks:
+      - financial-network
+
+  airflow-db:
+    image: postgres:17
+    container_name: financial-airflow-db
+    environment:
+      POSTGRES_DB: ${AIRFLOW_META_DB}
+      POSTGRES_USER: ${AIRFLOW_META_USER}
+      POSTGRES_PASSWORD: ${AIRFLOW_META_PASSWORD}
+    volumes:
+      - airflow_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AIRFLOW_META_USER} -d ${AIRFLOW_META_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - financial-network
+
+  airflow-init:
+    <<: *airflow-common
+    container_name: financial-airflow-init
+    command: db migrate
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+
+  airflow-api-server:
+    <<: *airflow-common
+    container_name: financial-airflow-api-server
+    command: api-server
+    ports:
+      - "8080:8080"
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "curl",
+          "--fail",
+          "http://localhost:8080/api/v2/monitor/health"
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: financial-airflow-scheduler
+    command: scheduler
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+      airflow-api-server:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "airflow jobs check --job-type SchedulerJob --local"
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+
+  airflow-dag-processor:
+    <<: *airflow-common
+    container_name: financial-airflow-dag-processor
+    command: dag-processor
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+      airflow-api-server:
+        condition: service_healthy
+
+volumes:
+  source_postgres_data:
+  warehouse_postgres_data:
+  object_store_data:
+  airflow_postgres_data:
+
+networks:
+  financial-network:
+    name: financial-dataops-network
